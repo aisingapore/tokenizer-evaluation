@@ -16,5 +16,6 @@ openlanguagedata/
 hf_cache/
 data/
 .ssh_control/
+*.pdf
 
 
