@@ -1,0 +1,57 @@
+# config.yaml
+
+# HPC Storage Locations
+cache_dir: "./hf_cache"
+output_dir: "./eval_results"
+
+# Tokenizers to Evaluate (referencing paper sources: Llama-3.1, Mistral-Nemo, Qwen-2.5, Gemma-2)
+tokenizers:
+  - "mistralai/Mistral-Nemo-Base-2407"
+  - "meta-llama/Meta-Llama-3.1-8B"
+  - "Qwen/Qwen2.5-7B"
+  - "google/gemma-2-9b"
+  - "TrustLLMeu/baseline-7-8b_2-3t-tokens_llama"
+
+  # Add your custom tokenizer path here if applicable
+  # - "/path/to/local/custom_tokenizer"
+
+# Data Configuration
+# "Monolingual" is for Compression/Fertility/Vocab Util (Efficiency)
+monolingual_data:
+  English:
+    - "data/monolingual/english/*.parquet"
+  Icelandic:
+    - "data/monolingual/icelandic/*.parquet"
+  Faroese:
+    - "data/monolingual/faroese/*.parquet"
+  German:
+    - "data/monolingual/german/*.parquet"
+  Swedish:
+    - "data/monolingual/swedish/*.parquet"
+  Danish:
+    - "data/monolingual/danish/*.parquet"
+  Norwegian:
+    - "data/monolingual/norwegian/*.parquet"
+  Dutch:
+    - "data/monolingual/dutch/*.parquet"
+  Code:
+    - "data/monolingual/code/*.parquet"
+  # Math:
+  #   - "data/monolingual/math/*.parquet"
+
+# "Parallel" is for Gini Coefficient (Fairness)
+# These should be parallel sentences (e.g., FLORES-200)
+# Pointing to dummy paths as parallel data is currently unavailable
+parallel_data:
+  English: "openlanguagedata/flores_plus/eng_Latn.dev"
+  Icelandic: "openlanguagedata/flores_plus/isl_Latn.dev"
+  Faroese: "openlanguagedata/flores_plus/fao_Latn.dev"
+  German: "openlanguagedata/flores_plus/deu_Latn.dev"
+  Swedish: "openlanguagedata/flores_plus/swe_Latn.dev"
+  Danish: "openlanguagedata/flores_plus/dan_Latn.dev"
+  Norwegian: "openlanguagedata/flores_plus/nob_Latn.dev" # Bokmål
+  Dutch: "openlanguagedata/flores_plus/nld_Latn.dev"
+
+# Evaluation Parameters
+sample_size_mb: 10  # How much data to stream per language for efficiency tests
+text_column_name: "text" # Default column name in parquet files
