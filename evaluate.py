@@ -2,7 +2,10 @@ import yaml
 import json
 import os
 import argparse
+import random
+import glob
 import numpy as np
+import pyarrow.parquet as pq
 from transformers import AutoTokenizer
 from datasets import load_dataset
 
@@ -47,6 +50,86 @@ def calc_gini(costs):
     return (1 / n) * (n + 1 - (2 * numerator / denominator))
 
 # --- Data Loading ---
+
+def stream_parquet_samples_random(file_paths, col_name, target_mb, seed=42):
+    """
+    Randomly sample text from parquet files until ~target_mb is reached.
+    Uses PyArrow to sample row groups randomly, avoiding full dataset scans.
+    """
+    target_bytes = target_mb * 1024 * 1024
+    samples = []
+    total_bytes = 0
+    
+    # Normalize file_paths to a list of specific files
+    if isinstance(file_paths, str):
+        file_paths = [file_paths]
+    
+    # Expand globs if necessary
+    expanded_paths = []
+    for p in file_paths:
+        if "*" in p:
+            expanded_paths.extend(glob.glob(p))
+        else:
+            expanded_paths.append(p)
+    
+    if not expanded_paths:
+        print(f"Warning: No files found for paths: {file_paths}")
+        return []
+
+    # 1. Collect all available row groups across all files
+    # Store as (file_path, row_group_index)
+    all_row_groups = []
+    
+    try:
+        for p in expanded_paths:
+            try:
+                pf = pq.ParquetFile(p)
+                for i in range(pf.num_row_groups):
+                    all_row_groups.append((p, i))
+            except Exception as e:
+                print(f"Warning: Could not read metadata for {p}: {e}")
+    except Exception as e:
+        print(f"Error initializing parquet files: {e}")
+        return []
+        
+    # 2. Shuffle the row groups to process them in random order
+    rng = random.Random(seed)
+    rng.shuffle(all_row_groups)
+    
+    # 3. Iterate and collect text until target size is reached
+    for p, rg_idx in all_row_groups:
+        if total_bytes >= target_bytes:
+            break
+            
+        try:
+            # Read specific row group
+            pf = pq.ParquetFile(p)
+            table = pf.read_row_group(rg_idx, columns=[col_name])
+            
+            # Convert to python list (shuffling rows within the group for extra randomness)
+            texts = table[col_name].to_pylist()
+            rng.shuffle(texts)
+            
+            for text in texts:
+                if not isinstance(text, str) or not text.strip():
+                    continue
+                
+                text_bytes = len(text.encode('utf-8'))
+                
+                # If this single row group is massive, we might overshoot slightly, 
+                # but checking per-row keeps us close to target.
+                samples.append(text)
+                total_bytes += text_bytes
+                
+                if total_bytes >= target_bytes:
+                    break
+                    
+        except Exception as e:
+            print(f"Error reading row group {rg_idx} from {p}: {e}")
+            continue
+            
+    return samples
+
 
 def stream_parquet_samples(file_paths, col_name, target_mb):
     samples = []
@@ -246,8 +329,188 @@ def run_eval(selected_metrics=None, skip_existing=True):
         json.dump(granular_results, f, indent=2)
     print(f"Granular results (size & tokens) saved to {granular_out_file}")
 
+
+def run_eval_random(selected_metrics=None, skip_existing=True, random_mode=False, seed=42):
+    config_path = os.path.join(os.path.dirname(__file__), "config", "config.yaml")
+    if not os.path.exists(config_path):
+        config_path = "config.yaml" # Fallback to current directory
+
+    with open(config_path, 'r') as f: config = yaml.safe_load(f)
+    
+    # Create unique output directory based on seed
+    output_dir = os.path.join(config['output_dir'], f"seed_{seed}")
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"Results will be saved to: {output_dir}")
+
+    cache_dir = config.get("cache_dir", None)
+    
+    # Load existing results if they exist in this specific seed folder
+    out_file = os.path.join(output_dir, "results.json")
+    granular_out_file = os.path.join(output_dir, "granular_results.json")
+    
+    existing_results = {}
+    existing_granular_results = {}
+    
+    if os.path.exists(out_file):
+        with open(out_file, 'r') as f:
+            existing_results = json.load(f)
+            print(f"Loaded existing results for {len(existing_results)} tokenizers")
+    
+    if os.path.exists(granular_out_file):
+        with open(granular_out_file, 'r') as f:
+            existing_granular_results = json.load(f)
+    
+    # Load HF Token if available
+    hf_token = None
+    token_path = os.path.join(os.path.dirname(__file__), "hf_token.txt")
+    if os.path.exists(token_path):
+        with open(token_path, 'r') as f:
+            hf_token = f.read().strip()
+        print("Loaded Hugging Face token from hf_token.txt")
+    
+    # 1. Load Data (Randomly Sampled)
+    load_mono = True
+    if selected_metrics and 'gini' in selected_metrics and len(selected_metrics) == 1:
+        load_mono = False
+    
+    mono_data = {}
+    data_stats = {} # Stats per language
+    
+    if load_mono:
+        print(f"Loading Monolingual Data (Random Seed {seed})...")
+        for lang, paths in config['monolingual_data'].items():
+            print(f"  Streaming {lang}...")
+            # Use the random streamer
+            samples = stream_parquet_samples_random(
+                paths, 
+                config['text_column_name'], 
+                config['sample_size_mb'], 
+                seed=seed
+            )
+            mono_data[lang] = samples
+            
+            # Calculate size in MB
+            total_bytes = sum(len(t.encode('utf-8')) for t in samples)
+            data_stats[lang] = {
+                "samples": len(samples),
+                "size_mb": total_bytes / (1024 * 1024)
+            }
+            
+    # Save metadata about the data used
+    metadata = {
+        "seed": seed,
+        "target_sample_size_mb": config['sample_size_mb'],
+        "data_stats": data_stats,
+        "monolingual_data_paths": config['monolingual_data']
+    }
+    with open(os.path.join(output_dir, "metadata.json"), 'w') as f:
+        json.dump(metadata, f, indent=2)
+    print(f"Data metadata saved to {os.path.join(output_dir, 'metadata.json')}")
+
+    print("Loading Parallel Data...")
+    parallel_data = {}
+    for lang, path in config['parallel_data'].items():
+        parallel_data[lang] = load_parallel_file(path)
+
+    # 2. Evaluate Tokenizers
+    results = existing_results.copy()
+    granular_results = existing_granular_results.copy()
+    
+    for model_name in config['tokenizers']:
+        # Determine if we need to evaluate this tokenizer
+        needs_eval = False
+        
+        if not skip_existing:
+            needs_eval = True
+        elif model_name not in results:
+            needs_eval = True
+        else:
+            if selected_metrics:
+                for m in selected_metrics:
+                    if m not in results[model_name]:
+                        needs_eval = True
+                        break
+        
+        if not needs_eval:
+            print(f"Skipping {model_name} (already evaluated)")
+            continue
+            
+        print(f"Evaluating {model_name}...")
+        try:
+            tok = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, token=hf_token)
+        except Exception as e:
+            print(f"  Skipping {model_name} (load fail: {e})")
+            continue
+            
+        if model_name in results:
+            res = results[model_name]
+        else:
+            res = {}
+            
+        if model_name in granular_results:
+            granular_res = granular_results[model_name]
+        else:
+            granular_res = {'data_size': {}, 'token_counts': {}}
+
+        if load_mono:
+            for lang, stats in data_stats.items():
+                granular_res['data_size'][lang] = stats['size_mb']  
+
+        # Efficiency Metrics & Vocab Utilization per Language
+        if load_mono:
+            all_text = []
+            
+            if selected_metrics is None or 'fertility' in selected_metrics:
+                if 'fertility' not in res: res['fertility'] = {}
+            if selected_metrics is None or 'compression' in selected_metrics:
+                if 'compression' not in res: res['compression'] = {}
+            if selected_metrics is None or 'vocab_utilization_per_lang' in selected_metrics:
+                if 'vocab_utilization_per_lang' not in res: res['vocab_utilization_per_lang'] = {}
+                
+            for lang, samples in mono_data.items():
+                if selected_metrics is None or 'fertility' in selected_metrics:
+                    res['fertility'][lang] = calc_fertility(tok, samples)
+                if selected_metrics is None or 'compression' in selected_metrics:
+                    res['compression'][lang] = calc_compression(tok, samples)
+                
+                if selected_metrics is None or 'vocab_utilization_per_lang' in selected_metrics:
+                     res['vocab_utilization_per_lang'][lang] = calc_vocab_util(tok, samples)
+
+                # Always calculate token counts for granular stats
+                token_count = calc_token_count(tok, samples)
+                granular_res['token_counts'][lang] = token_count
+
+                all_text.extend(samples)
+                
+            # Global Vocab Utilization
+            if selected_metrics is None or 'vocab_utilization' in selected_metrics:
+                res['vocab_utilization'] = calc_vocab_util(tok, all_text)
+        
+        # Fairness (Gini)
+        if selected_metrics is None or 'gini' in selected_metrics:
+            costs = []
+            for lang, samples in parallel_data.items():
+                comp = calc_compression(tok, samples)
+                if comp > 0: costs.append(1/comp)
+            res['gini'] = calc_gini(costs)
+
+        results[model_name] = res
+        granular_results[model_name] = granular_res
+        
+        # Save incrementally
+        with open(out_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        with open(granular_out_file, 'w') as f:
+            json.dump(granular_results, f, indent=2)
+
+    print(f"Results saved to {out_file}")
+    print(f"Granular results saved to {granular_out_file}")
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate tokenizers.")
+    parser.add_argument("--random", action="store_true", default=False,
+                        help="Evaluate tokenizers in random order. Default: False.")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed for sampling. Default: 42.")
     parser.add_argument("--metrics", nargs="+", 
                         choices=['fertility', 'compression', 'vocab_utilization', 'vocab_utilization_per_lang', 'gini'],
                         help="Specific metrics to run. Default: all.")
@@ -257,4 +520,5 @@ if __name__ == "__main__":
                         help="Re-evaluate all tokenizers, even if they have existing results.")
     args = parser.parse_args()
     
-    run_eval(args.metrics, args.skip_existing)
+    #run_eval(args.metrics, args.skip_existing)
+    run_eval_random(args.metrics, args.skip_existing, args.random, args.seed)

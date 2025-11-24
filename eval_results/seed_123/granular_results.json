@@ -1,0 +1,122 @@
+{
+  "mistralai/Mistral-Nemo-Base-2407": {
+    "data_size": {
+      "English": 10.058679580688477,
+      "Icelandic": 10.00162410736084,
+      "Faroese": 10.000434875488281,
+      "German": 10.004979133605957,
+      "Swedish": 10.00072956085205,
+      "Danish": 10.03012466430664,
+      "Norwegian": 10.02282428741455,
+      "Dutch": 10.004037857055664,
+      "Code": 10.004264831542969
+    },
+    "token_counts": {
+      "English": 2271747,
+      "Icelandic": 3769742,
+      "Faroese": 3919856,
+      "German": 2589814,
+      "Swedish": 3026441,
+      "Danish": 3187319,
+      "Norwegian": 3127937,
+      "Dutch": 2906982,
+      "Code": 3117032
+    }
+  },
+  "meta-llama/Meta-Llama-3.1-8B": {
+    "data_size": {
+      "English": 10.058679580688477,
+      "Icelandic": 10.00162410736084,
+      "Faroese": 10.000434875488281,
+      "German": 10.004979133605957,
+      "Swedish": 10.00072956085205,
+      "Danish": 10.03012466430664,
+      "Norwegian": 10.02282428741455,
+      "Dutch": 10.004037857055664,
+      "Code": 10.004264831542969
+    },
+    "token_counts": {
+      "English": 2203815,
+      "Icelandic": 4032211,
+      "Faroese": 4092449,
+      "German": 2878688,
+      "Swedish": 3156696,
+      "Danish": 3207032,
+      "Norwegian": 3153432,
+      "Dutch": 3067589,
+      "Code": 2669181
+    }
+  },
+  "Qwen/Qwen2.5-7B": {
+    "data_size": {
+      "English": 10.058679580688477,
+      "Icelandic": 10.00162410736084,
+      "Faroese": 10.000434875488281,
+      "German": 10.004979133605957,
+      "Swedish": 10.00072956085205,
+      "Danish": 10.03012466430664,
+      "Norwegian": 10.02282428741455,
+      "Dutch": 10.004037857055664,
+      "Code": 10.004264831542969
+    },
+    "token_counts": {
+      "English": 2259461,
+      "Icelandic": 4101805,
+      "Faroese": 4218810,
+      "German": 2900109,
+      "Swedish": 3191245,
+      "Danish": 3258534,
+      "Norwegian": 3205377,
+      "Dutch": 3106361,
+      "Code": 2947712
+    }
+  },
+  "google/gemma-2-9b": {
+    "data_size": {
+      "English": 10.058679580688477,
+      "Icelandic": 10.00162410736084,
+      "Faroese": 10.000434875488281,
+      "German": 10.004979133605957,
+      "Swedish": 10.00072956085205,
+      "Danish": 10.03012466430664,
+      "Norwegian": 10.02282428741455,
+      "Dutch": 10.004037857055664,
+      "Code": 10.004264831542969
+    },
+    "token_counts": {
+      "English": 2244078,
+      "Icelandic": 3615749,
+      "Faroese": 3792177,
+      "German": 2388893,
+      "Swedish": 2717188,
+      "Danish": 2878578,
+      "Norwegian": 2847610,
+      "Dutch": 2625117,
+      "Code": 3446633
+    }
+  },
+  "TrustLLMeu/baseline-7-8b_2-3t-tokens_llama": {
+    "data_size": {
+      "English": 10.058679580688477,
+      "Icelandic": 10.00162410736084,
+      "Faroese": 10.000434875488281,
+      "German": 10.004979133605957,
+      "Swedish": 10.00072956085205,
+      "Danish": 10.03012466430664,
+      "Norwegian": 10.02282428741455,
+      "Dutch": 10.004037857055664,
+      "Code": 10.004264831542969
+    },
+    "token_counts": {
+      "English": 2394343,
+      "Icelandic": 2698722,
+      "Faroese": 3379184,
+      "German": 2336524,
+      "Swedish": 2311232,
+      "Danish": 2431446,
+      "Norwegian": 2530215,
+      "Dutch": 2380901,
+      "Code": 3692172
+    }
+  }
+}

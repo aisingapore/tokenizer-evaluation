@@ -1,11 +1,13 @@
 import json
 import os
+import argparse
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
 def load_results(filepath):
     if not os.path.exists(filepath):
+        print(f"Warning: File not found: {filepath}")
         return None
     with open(filepath, 'r') as f:
         return json.load(f)
@@ -61,14 +63,41 @@ def plot_simple_bar(df, metric_name, y_label, output_dir, title_suffix=""):
     plt.close()
 
 def main():
-    results_path = "eval_results/results.json"
-    granular_results_path = "eval_results/granular_results.json"
-    output_dir = "eval_results/plots"
+    parser = argparse.ArgumentParser(description="Visualize tokenizer evaluation results.")
+    parser.add_argument("--input-dir", type=str, default="eval_results",
+                        help="Directory containing results.json. Default: eval_results")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="If set, looks in eval_results/seed_{seed} automatically.")
+    
+    args = parser.parse_args()
+    
+    base_dir = args.input_dir
+    if args.seed is not None:
+        # If input-dir was default, append seed. If user provided input-dir, trust them?
+        # Let's assume standard structure if seed is given.
+        if base_dir == "eval_results":
+             base_dir = os.path.join("eval_results", f"seed_{args.seed}")
+        else:
+             # If user gave a custom path AND a seed, maybe append?
+             # Safer to just use base_dir if it's custom.
+             # But for convenience, let's just say seed overrides path logic for the subfolder.
+             pass
+
+    results_path = os.path.join(base_dir, "results.json")
+    granular_results_path = os.path.join(base_dir, "granular_results.json")
+    output_dir = os.path.join(base_dir, "plots")
+    
+    print(f"Reading results from: {base_dir}")
+    print(f"Saving plots to: {output_dir}")
     
     os.makedirs(output_dir, exist_ok=True)
     
     data = load_results(results_path)
     granular_data = load_results(granular_results_path)
+    
+    if not data:
+        print("No results found to visualize.")
+        return
     
     # Prepare dataframes
     fertility_data = []

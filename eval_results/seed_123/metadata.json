@@ -1,0 +1,71 @@
+{
+  "seed": 123,
+  "target_sample_size_mb": 10,
+  "data_stats": {
+    "English": {
+      "samples": 2036,
+      "size_mb": 10.058679580688477
+    },
+    "Icelandic": {
+      "samples": 2275,
+      "size_mb": 10.00162410736084
+    },
+    "Faroese": {
+      "samples": 4400,
+      "size_mb": 10.000434875488281
+    },
+    "German": {
+      "samples": 3123,
+      "size_mb": 10.004979133605957
+    },
+    "Swedish": {
+      "samples": 3193,
+      "size_mb": 10.00072956085205
+    },
+    "Danish": {
+      "samples": 3243,
+      "size_mb": 10.03012466430664
+    },
+    "Norwegian": {
+      "samples": 2582,
+      "size_mb": 10.02282428741455
+    },
+    "Dutch": {
+      "samples": 3637,
+      "size_mb": 10.004037857055664
+    },
+    "Code": {
+      "samples": 1922,
+      "size_mb": 10.004264831542969
+    }
+  },
+  "monolingual_data_paths": {
+    "English": [
+      "data/monolingual/english/*.parquet"
+    ],
+    "Icelandic": [
+      "data/monolingual/icelandic/*.parquet"
+    ],
+    "Faroese": [
+      "data/monolingual/faroese/*.parquet"
+    ],
+    "German": [
+      "data/monolingual/german/*.parquet"
+    ],
+    "Swedish": [
+      "data/monolingual/swedish/*.parquet"
+    ],
+    "Danish": [
+      "data/monolingual/danish/*.parquet"
+    ],
+    "Norwegian": [
+      "data/monolingual/norwegian/*.parquet"
+    ],
+    "Dutch": [
+      "data/monolingual/dutch/*.parquet"
+    ],
+    "Code": [
+      "data/monolingual/code/*.parquet"
+    ]
+  }
+}
