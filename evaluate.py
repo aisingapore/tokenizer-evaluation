@@ -4,6 +4,7 @@ import os
 import argparse
 import random
 import glob
+import multiprocessing as mp
 import numpy as np
 import pyarrow.parquet as pq
 from transformers import AutoTokenizer
@@ -59,11 +60,11 @@ def stream_parquet_samples_random(file_paths, col_name, target_mb, seed=42):
     target_bytes = target_mb * 1024 * 1024
     samples = []
     total_bytes = 0
-    
+
     # Normalize file_paths to a list of specific files
     if isinstance(file_paths, str):
         file_paths = [file_paths]
-    
+
     # Expand globs if necessary
     expanded_paths = []
     for p in file_paths:
@@ -71,7 +72,7 @@ def stream_parquet_samples_random(file_paths, col_name, target_mb, seed=42):
             expanded_paths.extend(glob.glob(p))
         else:
             expanded_paths.append(p)
-    
+
     if not expanded_paths:
         print(f"Warning: No files found for paths: {file_paths}")
         return []
@@ -79,7 +80,7 @@ def stream_parquet_samples_random(file_paths, col_name, target_mb, seed=42):
     # 1. Collect all available row groups across all files
     # Store as (file_path, row_group_index)
     all_row_groups = []
-    
+
     try:
         for p in expanded_paths:
             try:
@@ -91,43 +92,43 @@ def stream_parquet_samples_random(file_paths, col_name, target_mb, seed=42):
     except Exception as e:
         print(f"Error initializing parquet files: {e}")
         return []
-        
+
     # 2. Shuffle the row groups to process them in random order
     rng = random.Random(seed)
     rng.shuffle(all_row_groups)
-    
+
     # 3. Iterate and collect text until target size is reached
     for p, rg_idx in all_row_groups:
         if total_bytes >= target_bytes:
             break
-            
+
         try:
             # Read specific row group
             pf = pq.ParquetFile(p)
             table = pf.read_row_group(rg_idx, columns=[col_name])
-            
+
             # Convert to python list (shuffling rows within the group for extra randomness)
             texts = table[col_name].to_pylist()
             rng.shuffle(texts)
-            
+
             for text in texts:
                 if not isinstance(text, str) or not text.strip():
                     continue
-                
+
                 text_bytes = len(text.encode('utf-8'))
-                
-                # If this single row group is massive, we might overshoot slightly, 
+
+                # If this single row group is massive, we might overshoot slightly,
                 # but checking per-row keeps us close to target.
                 samples.append(text)
                 total_bytes += text_bytes
-                
+
                 if total_bytes >= target_bytes:
                     break
-                    
+
         except Exception as e:
             print(f"Error reading row group {rg_idx} from {p}: {e}")
             continue
-            
+
     return samples
 
 
@@ -135,23 +136,23 @@ def stream_parquet_samples(file_paths, col_name, target_mb):
     samples = []
     curr_bytes = 0
     target_bytes = target_mb * 1024 * 1024
-    
+
     # Handle single string path or list of paths
     if isinstance(file_paths, str): file_paths = [file_paths]
-    
+
     try:
         # datasets can handle a list of glob patterns
         ds = load_dataset("parquet", data_files={'train': file_paths}, split='train', streaming=True)
         for row in ds:
             text = row.get(col_name, "")
             if not isinstance(text, str) or not text.strip(): continue
-            
+
             samples.append(text)
             curr_bytes += len(text.encode('utf-8'))
             if curr_bytes >= target_bytes: break
     except Exception as e:
         print(f"Error streaming {file_paths}: {e}")
-        
+
     return samples
 
 def load_parallel_file(path):
@@ -162,363 +163,320 @@ def load_parallel_file(path):
     except:
         return []
 
-# --- Main Runner ---
+# --- Parallel Tokenizer Evaluation ---
+#
+# Each tokenizer is loaded and evaluated in its own worker process. The (potentially
+# large) monolingual/parallel sample data is sent to each worker once via the Pool
+# initializer rather than per-task, to avoid re-pickling it for every tokenizer.
 
-def run_eval(selected_metrics=None, skip_existing=True):
+_worker_state = {}
+
+def _init_worker(mono_data, parallel_data, data_stats, cache_dir, hf_token, load_mono):
+    _worker_state.update(
+        mono_data=mono_data,
+        parallel_data=parallel_data,
+        data_stats=data_stats,
+        cache_dir=cache_dir,
+        hf_token=hf_token,
+        load_mono=load_mono,
+    )
+
+
+def _evaluate_tokenizer(task):
+    """Runs in a worker process. Returns (model_name, res, granular_res); res is None on load failure."""
+    model_name, selected_metrics = task
+    mono_data = _worker_state['mono_data']
+    parallel_data = _worker_state['parallel_data']
+    data_stats = _worker_state['data_stats']
+    cache_dir = _worker_state['cache_dir']
+    hf_token = _worker_state['hf_token']
+    load_mono = _worker_state['load_mono']
+
+    print(f"Evaluating {model_name}...")
+    try:
+        tok = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, token=hf_token)
+    except Exception as e:
+        print(f"  Skipping {model_name} (load fail: {e})")
+        return model_name, None, None
+
+    res = {}
+    granular_res = {'data_size': {}, 'token_counts': {}}
+
+    if load_mono:
+        for lang, stats in data_stats.items():
+            granular_res['data_size'][lang] = stats['size_mb']
+
+        want_fertility = selected_metrics is None or 'fertility' in selected_metrics
+        want_compression = selected_metrics is None or 'compression' in selected_metrics
+        want_vocab_per_lang = selected_metrics is None or 'vocab_utilization_per_lang' in selected_metrics
+        if want_fertility: res['fertility'] = {}
+        if want_compression: res['compression'] = {}
+        if want_vocab_per_lang: res['vocab_utilization_per_lang'] = {}
+
+        all_text = []
+        for lang, samples in mono_data.items():
+            if want_fertility: res['fertility'][lang] = calc_fertility(tok, samples)
+            if want_compression: res['compression'][lang] = calc_compression(tok, samples)
+            if want_vocab_per_lang: res['vocab_utilization_per_lang'][lang] = calc_vocab_util(tok, samples)
+
+            # Always calculate token counts for granular stats
+            granular_res['token_counts'][lang] = calc_token_count(tok, samples)
+            all_text.extend(samples)
+
+        # Global Vocab Utilization
+        if selected_metrics is None or 'vocab_utilization' in selected_metrics:
+            res['vocab_utilization'] = calc_vocab_util(tok, all_text)
+
+    # Fairness (Gini)
+    if selected_metrics is None or 'gini' in selected_metrics:
+        costs = []
+        for lang, samples in parallel_data.items():
+            # We calculate compression on parallel data to get comparable costs
+            comp = calc_compression(tok, samples)
+            if comp > 0: costs.append(1 / comp)
+        res['gini'] = calc_gini(costs)
+
+    print(f"  Finished {model_name}")
+    return model_name, res, granular_res
+
+
+def _tokenizers_to_evaluate(model_names, results, selected_metrics, skip_existing):
+    to_eval = []
+    for model_name in model_names:
+        needs_eval = not skip_existing or model_name not in results
+        if not needs_eval and selected_metrics:
+            needs_eval = any(m not in results[model_name] for m in selected_metrics)
+
+        if needs_eval:
+            to_eval.append(model_name)
+        else:
+            print(f"Skipping {model_name} (already evaluated)")
+    return to_eval
+
+
+def evaluate_tokenizers(model_names, mono_data, parallel_data, data_stats, selected_metrics,
+                         cache_dir, hf_token, load_mono, results, granular_results,
+                         num_workers=None, on_result=None):
+    """
+    Evaluates model_names in parallel worker processes, merging each tokenizer's
+    results into `results`/`granular_results` (in place) as it completes.
+    `on_result(results, granular_results)`, if given, is called after each merge
+    (e.g. to save incrementally).
+    """
+    if not model_names:
+        return results, granular_results
+
+    num_workers = max(1, min(num_workers or (os.cpu_count() or 1), len(model_names)))
+    print(f"Evaluating {len(model_names)} tokenizer(s) using {num_workers} worker process(es)...")
+
+    tasks = [(model_name, selected_metrics) for model_name in model_names]
+
+    ctx = mp.get_context("spawn")
+    with ctx.Pool(
+        processes=num_workers,
+        initializer=_init_worker,
+        initargs=(mono_data, parallel_data, data_stats, cache_dir, hf_token, load_mono),
+    ) as pool:
+        for model_name, new_res, new_granular in pool.imap_unordered(_evaluate_tokenizer, tasks):
+            if new_res is None:
+                continue
+
+            merged_res = results.get(model_name, {}).copy()
+            merged_res.update(new_res)
+            results[model_name] = merged_res
+
+            merged_granular = granular_results.get(model_name, {'data_size': {}, 'token_counts': {}}).copy()
+            if load_mono:
+                merged_granular['data_size'] = new_granular['data_size']
+                merged_granular['token_counts'] = new_granular['token_counts']
+            granular_results[model_name] = merged_granular
+
+            if on_result:
+                on_result(results, granular_results)
+
+    return results, granular_results
+
+
+# --- Shared Helpers ---
+
+def _load_config():
     config_path = os.path.join(os.path.dirname(__file__), "config", "config.yaml")
     if not os.path.exists(config_path):
-        config_path = "config.yaml" # Fallback to current directory
+        config_path = "config.yaml"  # Fallback to current directory
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
-    with open(config_path, 'r') as f: config = yaml.safe_load(f)
-    
-    os.makedirs(config['output_dir'], exist_ok=True)
-    cache_dir = config.get("cache_dir", None)
-    
-    # Load existing results if they exist
-    out_file = os.path.join(config['output_dir'], "results.json")
-    granular_out_file = os.path.join(config['output_dir'], "granular_results.json")
-    
-    existing_results = {}
-    existing_granular_results = {}
-    
-    # If skipping existing, load them first
-    if os.path.exists(out_file):
-        with open(out_file, 'r') as f:
-            existing_results = json.load(f)
-            print(f"Loaded existing results for {len(existing_results)} tokenizers")
-    
-    if os.path.exists(granular_out_file):
-        with open(granular_out_file, 'r') as f:
-            existing_granular_results = json.load(f)
-    
-    # Load HF Token if available
-    hf_token = None
+
+def _load_json(path):
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+def _load_hf_token():
     token_path = os.path.join(os.path.dirname(__file__), "hf_token.txt")
     if os.path.exists(token_path):
         with open(token_path, 'r') as f:
-            hf_token = f.read().strip()
+            token = f.read().strip()
         print("Loaded Hugging Face token from hf_token.txt")
-    
+        return token
+    return None
+
+
+# --- Main Runners ---
+
+def run_eval(selected_metrics=None, skip_existing=True, num_workers=None):
+    config = _load_config()
+
+    os.makedirs(config['output_dir'], exist_ok=True)
+    cache_dir = config.get("cache_dir", None)
+
+    out_file = os.path.join(config['output_dir'], "results.json")
+    granular_out_file = os.path.join(config['output_dir'], "granular_results.json")
+
+    results = _load_json(out_file)
+    granular_results = _load_json(granular_out_file)
+    if results:
+        print(f"Loaded existing results for {len(results)} tokenizers")
+
+    hf_token = _load_hf_token()
+
     # 1. Load Data
     # Only load monolingual data if we need efficiency metrics
-    load_mono = True
-    if selected_metrics and 'gini' in selected_metrics and len(selected_metrics) == 1:
-        load_mono = False
-    
+    load_mono = not (selected_metrics and set(selected_metrics) == {'gini'})
+
     mono_data = {}
-    data_stats = {} # Stats per language
-    
+    data_stats = {}  # Stats per language
+
     if load_mono:
         print("Loading Monolingual Data...")
         for lang, paths in config['monolingual_data'].items():
             print(f"  Streaming {lang}...")
             samples = stream_parquet_samples(paths, config['text_column_name'], config['sample_size_mb'])
             mono_data[lang] = samples
-            
-            # Calculate size in MB
+
             total_bytes = sum(len(t.encode('utf-8')) for t in samples)
             data_stats[lang] = {
                 "samples": len(samples),
-                "size_mb": total_bytes / (1024 * 1024)
+                "size_mb": total_bytes / (1024 * 1024),
             }
-        
+
     print("Loading Parallel Data...")
-    parallel_data = {}
-    for lang, path in config['parallel_data'].items():
-        parallel_data[lang] = load_parallel_file(path)
+    parallel_data = {lang: load_parallel_file(path) for lang, path in config['parallel_data'].items()}
 
-    # 2. Evaluate Tokenizers
-    results = existing_results.copy()  # Start with existing results
-    granular_results = existing_granular_results.copy()  # Start with existing granular results
-    
-    for model_name in config['tokenizers']:
-        # Determine if we need to evaluate this tokenizer
-        needs_eval = False
-        
-        if not skip_existing:
-            needs_eval = True
-        elif model_name not in results:
-            needs_eval = True
-        else:
-            # Check if any requested metric is missing
-            # If no specific metrics requested, and we have results, we assume it's done (unless skip_existing=False)
-            # But if specific metrics are requested (like 'gini'), we check if they exist.
-            if selected_metrics:
-                for m in selected_metrics:
-                    if m not in results[model_name]:
-                        needs_eval = True
-                        break
-        
-        if not needs_eval:
-            print(f"Skipping {model_name} (already evaluated)")
-            continue
-            
-        print(f"Evaluating {model_name}...")
-        try:
-            tok = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, token=hf_token)
-        except Exception as e:
-            print(f"  Skipping {model_name} (load fail: {e})")
-            continue
-            
-        # Initialize result container, preserving existing if we are just adding metrics
-        if model_name in results:
-            res = results[model_name]
-        else:
-            res = {}
-            
-        if model_name in granular_results:
-            granular_res = granular_results[model_name]
-        else:
-            granular_res = {'data_size': {}, 'token_counts': {}}
-
-        # Copy data stats to granular results if we have them
-        if load_mono:
-            for lang, stats in data_stats.items():
-                granular_res['data_size'][lang] = stats['size_mb']
-
-        # Efficiency Metrics & Vocab Utilization per Language
-        if load_mono:
-            all_text = []
-            
-            if selected_metrics is None or 'fertility' in selected_metrics:
-                if 'fertility' not in res: res['fertility'] = {}
-            if selected_metrics is None or 'compression' in selected_metrics:
-                if 'compression' not in res: res['compression'] = {}
-            if selected_metrics is None or 'vocab_utilization_per_lang' in selected_metrics:
-                if 'vocab_utilization_per_lang' not in res: res['vocab_utilization_per_lang'] = {}
-                
-            for lang, samples in mono_data.items():
-                if selected_metrics is None or 'fertility' in selected_metrics:
-                    res['fertility'][lang] = calc_fertility(tok, samples)
-                if selected_metrics is None or 'compression' in selected_metrics:
-                    res['compression'][lang] = calc_compression(tok, samples)
-                
-                if selected_metrics is None or 'vocab_utilization_per_lang' in selected_metrics:
-                     res['vocab_utilization_per_lang'][lang] = calc_vocab_util(tok, samples)
-
-                # Always calculate token counts for granular stats
-                token_count = calc_token_count(tok, samples)
-                granular_res['token_counts'][lang] = token_count
-
-                all_text.extend(samples)
-                
-            # Global Vocab Utilization
-            if selected_metrics is None or 'vocab_utilization' in selected_metrics:
-                res['vocab_utilization'] = calc_vocab_util(tok, all_text)
-        
-        # Fairness (Gini)
-        if selected_metrics is None or 'gini' in selected_metrics:
-            costs = []
-            for lang, samples in parallel_data.items():
-                # We calculate compression on parallel data to get comparable costs
-                comp = calc_compression(tok, samples)
-                if comp > 0: costs.append(1/comp)
-            res['gini'] = calc_gini(costs)
-
-        results[model_name] = res
-        granular_results[model_name] = granular_res
+    # 2. Evaluate Tokenizers (in parallel)
+    to_eval = _tokenizers_to_evaluate(config['tokenizers'], results, selected_metrics, skip_existing)
+    evaluate_tokenizers(
+        to_eval, mono_data, parallel_data, data_stats, selected_metrics,
+        cache_dir, hf_token, load_mono, results, granular_results,
+        num_workers=num_workers,
+    )
 
     # 3. Save
-    out_file = os.path.join(config['output_dir'], "results.json")
     with open(out_file, 'w') as f:
         json.dump(results, f, indent=2)
     print(f"Results saved to {out_file}")
 
-    granular_out_file = os.path.join(config['output_dir'], "granular_results.json")
     with open(granular_out_file, 'w') as f:
         json.dump(granular_results, f, indent=2)
     print(f"Granular results (size & tokens) saved to {granular_out_file}")
 
 
-def run_eval_random(selected_metrics=None, skip_existing=True, random_mode=False, seed=42):
-    config_path = os.path.join(os.path.dirname(__file__), "config", "config.yaml")
-    if not os.path.exists(config_path):
-        config_path = "config.yaml" # Fallback to current directory
+def run_eval_random(selected_metrics=None, skip_existing=True, random_mode=False, seed=42, num_workers=None):
+    config = _load_config()
 
-    with open(config_path, 'r') as f: config = yaml.safe_load(f)
-    
     # Create unique output directory based on seed
     output_dir = os.path.join(config['output_dir'], f"seed_{seed}")
     os.makedirs(output_dir, exist_ok=True)
     print(f"Results will be saved to: {output_dir}")
 
     cache_dir = config.get("cache_dir", None)
-    
-    # Load existing results if they exist in this specific seed folder
+
     out_file = os.path.join(output_dir, "results.json")
     granular_out_file = os.path.join(output_dir, "granular_results.json")
-    
-    existing_results = {}
-    existing_granular_results = {}
-    
-    if os.path.exists(out_file):
-        with open(out_file, 'r') as f:
-            existing_results = json.load(f)
-            print(f"Loaded existing results for {len(existing_results)} tokenizers")
-    
-    if os.path.exists(granular_out_file):
-        with open(granular_out_file, 'r') as f:
-            existing_granular_results = json.load(f)
-    
-    # Load HF Token if available
-    hf_token = None
-    token_path = os.path.join(os.path.dirname(__file__), "hf_token.txt")
-    if os.path.exists(token_path):
-        with open(token_path, 'r') as f:
-            hf_token = f.read().strip()
-        print("Loaded Hugging Face token from hf_token.txt")
-    
+
+    results = _load_json(out_file)
+    granular_results = _load_json(granular_out_file)
+    if results:
+        print(f"Loaded existing results for {len(results)} tokenizers")
+
+    hf_token = _load_hf_token()
+
     # 1. Load Data (Randomly Sampled)
-    load_mono = True
-    if selected_metrics and 'gini' in selected_metrics and len(selected_metrics) == 1:
-        load_mono = False
-    
+    load_mono = not (selected_metrics and set(selected_metrics) == {'gini'})
+
     mono_data = {}
-    data_stats = {} # Stats per language
-    
+    data_stats = {}  # Stats per language
+
     if load_mono:
         print(f"Loading Monolingual Data (Random Seed {seed})...")
         for lang, paths in config['monolingual_data'].items():
             print(f"  Streaming {lang}...")
-            # Use the random streamer
             samples = stream_parquet_samples_random(
-                paths, 
-                config['text_column_name'], 
-                config['sample_size_mb'], 
-                seed=seed
+                paths,
+                config['text_column_name'],
+                config['sample_size_mb'],
+                seed=seed,
             )
             mono_data[lang] = samples
-            
-            # Calculate size in MB
+
             total_bytes = sum(len(t.encode('utf-8')) for t in samples)
             data_stats[lang] = {
                 "samples": len(samples),
-                "size_mb": total_bytes / (1024 * 1024)
+                "size_mb": total_bytes / (1024 * 1024),
             }
-            
+
     # Save metadata about the data used
     metadata = {
         "seed": seed,
         "target_sample_size_mb": config['sample_size_mb'],
         "data_stats": data_stats,
-        "monolingual_data_paths": config['monolingual_data']
+        "monolingual_data_paths": config['monolingual_data'],
     }
     with open(os.path.join(output_dir, "metadata.json"), 'w') as f:
         json.dump(metadata, f, indent=2)
     print(f"Data metadata saved to {os.path.join(output_dir, 'metadata.json')}")
 
     print("Loading Parallel Data...")
-    parallel_data = {}
-    for lang, path in config['parallel_data'].items():
-        parallel_data[lang] = load_parallel_file(path)
+    parallel_data = {lang: load_parallel_file(path) for lang, path in config['parallel_data'].items()}
 
-    # 2. Evaluate Tokenizers
-    results = existing_results.copy()
-    granular_results = existing_granular_results.copy()
-    
-    for model_name in config['tokenizers']:
-        # Determine if we need to evaluate this tokenizer
-        needs_eval = False
-        
-        if not skip_existing:
-            needs_eval = True
-        elif model_name not in results:
-            needs_eval = True
-        else:
-            if selected_metrics:
-                for m in selected_metrics:
-                    if m not in results[model_name]:
-                        needs_eval = True
-                        break
-        
-        if not needs_eval:
-            print(f"Skipping {model_name} (already evaluated)")
-            continue
-            
-        print(f"Evaluating {model_name}...")
-        try:
-            tok = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, token=hf_token)
-        except Exception as e:
-            print(f"  Skipping {model_name} (load fail: {e})")
-            continue
-            
-        if model_name in results:
-            res = results[model_name]
-        else:
-            res = {}
-            
-        if model_name in granular_results:
-            granular_res = granular_results[model_name]
-        else:
-            granular_res = {'data_size': {}, 'token_counts': {}}
-
-        if load_mono:
-            for lang, stats in data_stats.items():
-                granular_res['data_size'][lang] = stats['size_mb']  
-
-        # Efficiency Metrics & Vocab Utilization per Language
-        if load_mono:
-            all_text = []
-            
-            if selected_metrics is None or 'fertility' in selected_metrics:
-                if 'fertility' not in res: res['fertility'] = {}
-            if selected_metrics is None or 'compression' in selected_metrics:
-                if 'compression' not in res: res['compression'] = {}
-            if selected_metrics is None or 'vocab_utilization_per_lang' in selected_metrics:
-                if 'vocab_utilization_per_lang' not in res: res['vocab_utilization_per_lang'] = {}
-                
-            for lang, samples in mono_data.items():
-                if selected_metrics is None or 'fertility' in selected_metrics:
-                    res['fertility'][lang] = calc_fertility(tok, samples)
-                if selected_metrics is None or 'compression' in selected_metrics:
-                    res['compression'][lang] = calc_compression(tok, samples)
-                
-                if selected_metrics is None or 'vocab_utilization_per_lang' in selected_metrics:
-                     res['vocab_utilization_per_lang'][lang] = calc_vocab_util(tok, samples)
-
-                # Always calculate token counts for granular stats
-                token_count = calc_token_count(tok, samples)
-                granular_res['token_counts'][lang] = token_count
-
-                all_text.extend(samples)
-                
-            # Global Vocab Utilization
-            if selected_metrics is None or 'vocab_utilization' in selected_metrics:
-                res['vocab_utilization'] = calc_vocab_util(tok, all_text)
-        
-        # Fairness (Gini)
-        if selected_metrics is None or 'gini' in selected_metrics:
-            costs = []
-            for lang, samples in parallel_data.items():
-                comp = calc_compression(tok, samples)
-                if comp > 0: costs.append(1/comp)
-            res['gini'] = calc_gini(costs)
-
-        results[model_name] = res
-        granular_results[model_name] = granular_res
-        
-        # Save incrementally
+    # 2. Evaluate Tokenizers (in parallel), saving after each one completes
+    def _save(results, granular_results):
         with open(out_file, 'w') as f:
             json.dump(results, f, indent=2)
         with open(granular_out_file, 'w') as f:
             json.dump(granular_results, f, indent=2)
 
+    to_eval = _tokenizers_to_evaluate(config['tokenizers'], results, selected_metrics, skip_existing)
+    evaluate_tokenizers(
+        to_eval, mono_data, parallel_data, data_stats, selected_metrics,
+        cache_dir, hf_token, load_mono, results, granular_results,
+        num_workers=num_workers, on_result=_save,
+    )
+
+    _save(results, granular_results)
+
     print(f"Results saved to {out_file}")
     print(f"Granular results saved to {granular_out_file}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate tokenizers.")
     parser.add_argument("--random", action="store_true", default=False,
                         help="Evaluate tokenizers in random order. Default: False.")
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed for sampling. Default: 42.")
-    parser.add_argument("--metrics", nargs="+", 
+    parser.add_argument("--metrics", nargs="+",
                         choices=['fertility', 'compression', 'vocab_utilization', 'vocab_utilization_per_lang', 'gini'],
                         help="Specific metrics to run. Default: all.")
     parser.add_argument("--skip-existing", action="store_true", default=True,
                         help="Skip tokenizers that already have results. Default: True.")
     parser.add_argument("--no-skip-existing", dest="skip_existing", action="store_false",
                         help="Re-evaluate all tokenizers, even if they have existing results.")
+    parser.add_argument("--workers", type=int, default=None,
+                        help="Number of tokenizers to evaluate in parallel. Default: min(CPU count, number of tokenizers).")
     args = parser.parse_args()
-    
-    #run_eval(args.metrics, args.skip_existing)
-    run_eval_random(args.metrics, args.skip_existing, args.random, args.seed)
+
+    #run_eval(args.metrics, args.skip_existing, num_workers=args.workers)
+    run_eval_random(args.metrics, args.skip_existing, args.random, args.seed, num_workers=args.workers)

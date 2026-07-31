@@ -6,13 +6,19 @@ from datasets import load_dataset
 # We will check what is actually in the dataset.
 iso_map = {
     "eng": "eng_Latn",
-    "swe": "swe_Latn",
-    "nob": "nob_Latn", # Bokmål
-    "isl": "isl_Latn",
-    "fao": "fao_Latn",
-    "nld": "nld_Latn",
-    "dan": "dan_Latn",
-    "deu": "deu_Latn"
+    "ind": "ind_Latn",
+    "mya": "mya_Mymr",
+    "fil": "fil_Latn",
+    "tha": "tha_Thai",
+    "lao": "lao_Laoo",
+    "tam": "tam_Taml",
+    "vie": "vie_Latn",
+    "zsm": "zsm_Latn",
+    "cmn": "cmn_Hans",
+    "khm": "khm_Khmr",
+    "ban": "ban_Latn",
+    "jav": "jav_Latn",
+    "sun": "sun_Latn",
 }
 
 dataset_id = "openlanguagedata/flores_plus"

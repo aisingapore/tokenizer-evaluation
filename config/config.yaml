@@ -10,7 +10,10 @@ tokenizers:
   - "meta-llama/Meta-Llama-3.1-8B"
   - "Qwen/Qwen2.5-7B"
   - "google/gemma-2-9b"
-  - "TrustLLMeu/baseline-7-8b_2-3t-tokens_llama"
+  - "google/gemma-4-31B-it"
+  - "Qwen/Qwen3.6-35B-A3B"
+  - "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16"
+  - "aisingapore/sealion-bert-base"
 
   # Add your custom tokenizer path here if applicable
   # - "/path/to/local/custom_tokenizer"
@@ -18,39 +21,53 @@ tokenizers:
 # Data Configuration
 # "Monolingual" is for Compression/Fertility/Vocab Util (Efficiency)
 monolingual_data:
+  Balinese:
+    - "data/monolingual/balinese/000_00000.parquet"
+  Burmese:
+    - "data/monolingual/burmese/000_00000.parquet"
+  Chinese:
+    - "data/monolingual/chinese/000_00050.parquet"
   English:
-    - "data/monolingual/english/*.parquet"
-  Icelandic:
-    - "data/monolingual/icelandic/*.parquet"
-  Faroese:
-    - "data/monolingual/faroese/*.parquet"
-  German:
-    - "data/monolingual/german/*.parquet"
-  Swedish:
-    - "data/monolingual/swedish/*.parquet"
-  Danish:
-    - "data/monolingual/danish/*.parquet"
-  Norwegian:
-    - "data/monolingual/norwegian/*.parquet"
-  Dutch:
-    - "data/monolingual/dutch/*.parquet"
-  Code:
-    - "data/monolingual/code/*.parquet"
-  # Math:
-  #   - "data/monolingual/math/*.parquet"
+    - "data/monolingual/english/003_00000.parquet"
+  Filipino:
+    - "data/monolingual/filipino/000_00000.parquet"
+  Indonesian:
+    - "data/monolingual/indonesian/001_00000.parquet"
+  Javanese:
+    - "data/monolingual/javanese/000_00000.parquet"
+  Khmer:
+    - "data/monolingual/khmer/000_00000.parquet"
+  Laos:
+    - "data/monolingual/laos/000_00000.parquet"
+  Malay:
+    - "data/monolingual/malay/001_00000.parquet"
+  Sudanese:
+    - "data/monolingual/sudanese/000_00000.parquet"
+  Tamil:
+    - "data/monolingual/tamil/001_00000.parquet"
+  Thai:
+    - "data/monolingual/thai/002_00000.parquet"
+  Vietnamese:
+    - "data/monolingual/vietnamese/001_00005.parquet"
 
 # "Parallel" is for Gini Coefficient (Fairness)
 # These should be parallel sentences (e.g., FLORES-200)
 # Pointing to dummy paths as parallel data is currently unavailable
 parallel_data:
+  Balinese: "openlanguagedata/flores_plus/ban_Latn.dev"
+  Chinese: "openlanguagedata/flores_plus/cmn_Hans.dev"
   English: "openlanguagedata/flores_plus/eng_Latn.dev"
-  Icelandic: "openlanguagedata/flores_plus/isl_Latn.dev"
-  Faroese: "openlanguagedata/flores_plus/fao_Latn.dev"
-  German: "openlanguagedata/flores_plus/deu_Latn.dev"
-  Swedish: "openlanguagedata/flores_plus/swe_Latn.dev"
-  Danish: "openlanguagedata/flores_plus/dan_Latn.dev"
-  Norwegian: "openlanguagedata/flores_plus/nob_Latn.dev" # Bokmål
-  Dutch: "openlanguagedata/flores_plus/nld_Latn.dev"
+  Filipino: "openlanguagedata/flores_plus/fil_Latn.dev"
+  Indonesian: "openlanguagedata/flores_plus/ind_Latn.dev"
+  Javanese: "openlanguagedata/flores_plus/jav_Latn.dev"
+  Khmer: "openlanguagedata/flores_plus/khm_Khmr.dev"
+  Laos: "openlanguagedata/flores_plus/lao_Laoo.dev"
+  Burmese: "openlanguagedata/flores_plus/mya_Mymr.dev"
+  Sudanese: "openlanguagedata/flores_plus/sun_Latn.dev"
+  Tamil: "openlanguagedata/flores_plus/tam_Taml.dev"
+  Thai: "openlanguagedata/flores_plus/tha_Thai.dev"
+  Vietnamese: "openlanguagedata/flores_plus/vie_Latn.dev"
+  Malay: "openlanguagedata/flores_plus/zsm_Latn.dev"
 
 # Evaluation Parameters
 sample_size_mb: 10  # How much data to stream per language for efficiency tests

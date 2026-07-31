@@ -102,7 +102,7 @@ python evaluate.py --metrics compression fertility
 Create plots for all metrics:
 
 ```bash
-python visualize.py
+python visualize.py --input-dir "./eval_results/seed_XXXX"
 ```
 
 Plots are saved to `eval_results/plots/`:
