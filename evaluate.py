@@ -194,7 +194,7 @@ def _evaluate_tokenizer(task):
 
     print(f"Evaluating {model_name}...")
     try:
-        tok = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, token=hf_token)
+        tok = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, token=hf_token, trust_remote_code=True)
     except Exception as e:
         print(f"  Skipping {model_name} (load fail: {e})")
         return model_name, None, None
