@@ -1,0 +1,106 @@
+{
+  "seed": 69,
+  "target_sample_size_mb": 10,
+  "data_stats": {
+    "Balinese": {
+      "samples": 1592,
+      "size_mb": 10.001569747924805
+    },
+    "Burmese": {
+      "samples": 1189,
+      "size_mb": 10.000151634216309
+    },
+    "Chinese": {
+      "samples": 2586,
+      "size_mb": 10.000799179077148
+    },
+    "English": {
+      "samples": 2385,
+      "size_mb": 10.00130558013916
+    },
+    "Filipino": {
+      "samples": 2855,
+      "size_mb": 10.002509117126465
+    },
+    "Indonesian": {
+      "samples": 2681,
+      "size_mb": 10.00562858581543
+    },
+    "Javanese": {
+      "samples": 2247,
+      "size_mb": 10.000205993652344
+    },
+    "Khmer": {
+      "samples": 1866,
+      "size_mb": 10.010236740112305
+    },
+    "Laos": {
+      "samples": 1667,
+      "size_mb": 10.003937721252441
+    },
+    "Malay": {
+      "samples": 2993,
+      "size_mb": 10.00362777709961
+    },
+    "Sudanese": {
+      "samples": 2423,
+      "size_mb": 10.054609298706055
+    },
+    "Tamil": {
+      "samples": 1770,
+      "size_mb": 10.001534461975098
+    },
+    "Thai": {
+      "samples": 1189,
+      "size_mb": 10.004258155822754
+    },
+    "Vietnamese": {
+      "samples": 2175,
+      "size_mb": 10.00326156616211
+    }
+  },
+  "monolingual_data_paths": {
+    "Balinese": [
+      "data/monolingual/balinese/000_00000.parquet"
+    ],
+    "Burmese": [
+      "data/monolingual/burmese/000_00000.parquet"
+    ],
+    "Chinese": [
+      "data/monolingual/chinese/000_00050.parquet"
+    ],
+    "English": [
+      "data/monolingual/english/003_00000.parquet"
+    ],
+    "Filipino": [
+      "data/monolingual/filipino/000_00000.parquet"
+    ],
+    "Indonesian": [
+      "data/monolingual/indonesian/001_00000.parquet"
+    ],
+    "Javanese": [
+      "data/monolingual/javanese/000_00000.parquet"
+    ],
+    "Khmer": [
+      "data/monolingual/khmer/000_00000.parquet"
+    ],
+    "Laos": [
+      "data/monolingual/laos/000_00000.parquet"
+    ],
+    "Malay": [
+      "data/monolingual/malay/001_00000.parquet"
+    ],
+    "Sudanese": [
+      "data/monolingual/sudanese/000_00000.parquet"
+    ],
+    "Tamil": [
+      "data/monolingual/tamil/001_00000.parquet"
+    ],
+    "Thai": [
+      "data/monolingual/thai/002_00000.parquet"
+    ],
+    "Vietnamese": [
+      "data/monolingual/vietnamese/001_00005.parquet"
+    ]
+  }
+}

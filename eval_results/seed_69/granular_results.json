@@ -1,0 +1,172 @@
+{
+  "google/gemma-4-31B-it": {
+    "data_size": {
+      "Balinese": 10.001569747924805,
+      "Burmese": 10.000151634216309,
+      "Chinese": 10.000799179077148,
+      "English": 10.00130558013916,
+      "Filipino": 10.002509117126465,
+      "Indonesian": 10.00562858581543,
+      "Javanese": 10.000205993652344,
+      "Khmer": 10.010236740112305,
+      "Laos": 10.003937721252441,
+      "Malay": 10.00362777709961,
+      "Sudanese": 10.054609298706055,
+      "Tamil": 10.001534461975098,
+      "Thai": 10.004258155822754,
+      "Vietnamese": 10.00326156616211
+    },
+    "token_counts": {
+      "Balinese": 2929048,
+      "Burmese": 1865171,
+      "Chinese": 2675430,
+      "English": 2275644,
+      "Filipino": 2944832,
+      "Indonesian": 2330428,
+      "Javanese": 3048379,
+      "Khmer": 1765873,
+      "Laos": 2123410,
+      "Malay": 2552723,
+      "Sudanese": 3139187,
+      "Tamil": 1020451,
+      "Thai": 1284772,
+      "Vietnamese": 2237527
+    }
+  },
+  "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16": {
+    "data_size": {
+      "Balinese": 10.001569747924805,
+      "Burmese": 10.000151634216309,
+      "Chinese": 10.000799179077148,
+      "English": 10.00130558013916,
+      "Filipino": 10.002509117126465,
+      "Indonesian": 10.00562858581543,
+      "Javanese": 10.000205993652344,
+      "Khmer": 10.010236740112305,
+      "Laos": 10.003937721252441,
+      "Malay": 10.00362777709961,
+      "Sudanese": 10.054609298706055,
+      "Tamil": 10.001534461975098,
+      "Thai": 10.004258155822754,
+      "Vietnamese": 10.00326156616211
+    },
+    "token_counts": {
+      "Balinese": 3085576,
+      "Burmese": 2444357,
+      "Chinese": 3644163,
+      "English": 2299483,
+      "Filipino": 3182977,
+      "Indonesian": 2755804,
+      "Javanese": 3435643,
+      "Khmer": 10175335,
+      "Laos": 10140237,
+      "Malay": 2908239,
+      "Sudanese": 3552154,
+      "Tamil": 1580234,
+      "Thai": 1994792,
+      "Vietnamese": 2421513
+    }
+  },
+  "openai/gpt-oss-120b": {
+    "data_size": {
+      "Balinese": 10.001569747924805,
+      "Burmese": 10.000151634216309,
+      "Chinese": 10.000799179077148,
+      "English": 10.00130558013916,
+      "Filipino": 10.002509117126465,
+      "Indonesian": 10.00562858581543,
+      "Javanese": 10.000205993652344,
+      "Khmer": 10.010236740112305,
+      "Laos": 10.003937721252441,
+      "Malay": 10.00362777709961,
+      "Sudanese": 10.054609298706055,
+      "Tamil": 10.001534461975098,
+      "Thai": 10.004258155822754,
+      "Vietnamese": 10.00326156616211
+    },
+    "token_counts": {
+      "Balinese": 2859009,
+      "Burmese": 2016340,
+      "Chinese": 2936625,
+      "English": 2212501,
+      "Filipino": 2650769,
+      "Indonesian": 2419884,
+      "Javanese": 2842878,
+      "Khmer": 2211933,
+      "Laos": 6385925,
+      "Malay": 2634522,
+      "Sudanese": 2790430,
+      "Tamil": 1325799,
+      "Thai": 1469938,
+      "Vietnamese": 2369149
+    }
+  },
+  "deepseek-ai/DeepSeek-V4.1-Flash": {
+    "data_size": {
+      "Balinese": 10.001569747924805,
+      "Burmese": 10.000151634216309,
+      "Chinese": 10.000799179077148,
+      "English": 10.00130558013916,
+      "Filipino": 10.002509117126465,
+      "Indonesian": 10.00562858581543,
+      "Javanese": 10.000205993652344,
+      "Khmer": 10.010236740112305,
+      "Laos": 10.003937721252441,
+      "Malay": 10.00362777709961,
+      "Sudanese": 10.054609298706055,
+      "Tamil": 10.001534461975098,
+      "Thai": 10.004258155822754,
+      "Vietnamese": 10.00326156616211
+    },
+    "token_counts": {
+      "Balinese": 3059749,
+      "Burmese": 3532004,
+      "Chinese": 2306408,
+      "English": 2220081,
+      "Filipino": 3209690,
+      "Indonesian": 2679294,
+      "Javanese": 3381123,
+      "Khmer": 4468255,
+      "Laos": 6231372,
+      "Malay": 2874554,
+      "Sudanese": 3527642,
+      "Tamil": 2093749,
+      "Thai": 1489329,
+      "Vietnamese": 3387911
+    }
+  },
+  "Qwen/Qwen3.8-27B": {
+    "data_size": {
+      "Balinese": 10.001569747924805,
+      "Burmese": 10.000151634216309,
+      "Chinese": 10.000799179077148,
+      "English": 10.00130558013916,
+      "Filipino": 10.002509117126465,
+      "Indonesian": 10.00562858581543,
+      "Javanese": 10.000205993652344,
+      "Khmer": 10.010236740112305,
+      "Laos": 10.003937721252441,
+      "Malay": 10.00362777709961,
+      "Sudanese": 10.054609298706055,
+      "Tamil": 10.001534461975098,
+      "Thai": 10.004258155822754,
+      "Vietnamese": 10.00326156616211
+    },
+    "token_counts": {
+      "Balinese": 2928783,
+      "Burmese": 3176533,
+      "Chinese": 2290530,
+      "English": 2311225,
+      "Filipino": 3180450,
+      "Indonesian": 2228121,
+      "Javanese": 3118701,
+      "Khmer": 3750153,
+      "Laos": 3947829,
+      "Malay": 2513277,
+      "Sudanese": 3288863,
+      "Tamil": 2799687,
+      "Thai": 1911356,
+      "Vietnamese": 2144690
+    }
+  }
+}

@@ -6,14 +6,18 @@ output_dir: "./eval_results"
 
 # Tokenizers to Evaluate (referencing paper sources: Llama-3.1, Mistral-Nemo, Qwen-2.5, Gemma-2)
 tokenizers:
-  - "mistralai/Mistral-Nemo-Base-2407"
-  - "meta-llama/Meta-Llama-3.1-8B"
-  - "Qwen/Qwen2.5-7B"
-  - "google/gemma-2-9b"
+  # - "meta-llama/Llama-3.3-70B-Instruct"
+  # - "Qwen/Qwen3.6-35B-A3B"
   - "google/gemma-4-31B-it"
-  - "Qwen/Qwen3.6-35B-A3B"
+  # - "moonshotai/Kimi-K3"
+  # - "zai-org/GLM-5.2"
   - "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16"
-  - "aisingapore/sealion-bert-base"
+  - "openai/gpt-oss-120b"
+  - "deepseek-ai/DeepSeek-V4.1-Flash"
+  - "Qwen/Qwen3.8-27B"
+  # - "aisingapore/sealion-bert-base"
+  # - "meta-models/Muse-Glimmer-30B"
+  # - "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16"
 
   # Add your custom tokenizer path here if applicable
   # - "/path/to/local/custom_tokenizer"
