@@ -136,11 +136,12 @@ def load_hf_token():
 def print_table(results, languages):
     models = list(results)
     short = [m.split("/")[-1][:22] for m in models]
-    for metric in ("fertility", "token_ratio_vs_english"):
+    for metric, fmt in (("total_tokens", "{:>24,d}"), ("fertility", "{:>24.3f}"),
+                        ("token_ratio_vs_english", "{:>24.3f}")):
         print(f"\n{metric}")
         print(f"{'Language':<12}" + "".join(f"{s:>24}" for s in short))
         for lang in languages:
-            print(f"{lang:<12}" + "".join(f"{results[m][metric][lang]:>24.3f}" for m in models))
+            print(f"{lang:<12}" + "".join(fmt.format(results[m][metric][lang]) for m in models))
 
 
 def main():
